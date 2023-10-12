@@ -244,6 +244,58 @@ async def get_coil_stats(interval_start: datetime.date, interval_end: datetime.d
     else:
         resp['max_interval'] = "There are no deleted coils in this interval"
 
+    # Запрос для нахождения минимального количества рулонов
+    min_coil_count = (
+        db.query(func.count(models.Coil.id))
+        .filter(models.Coil.add_date >= interval_start, models.Coil.add_date <= interval_end)
+        .scalar()
+    )
+    
+    # Запрос для нахождения максимального количества рулонов
+    max_coil_count = (
+        db.query(func.count(models.Coil.id))
+        .filter(models.Coil.add_date >= interval_start, models.Coil.add_date <= interval_end)
+        .scalar()
+    )
+
+    # Даты с минимальным и максимальным количеством рулонов
+    min_coil_date = (
+        db.query(models.Coil.add_date)
+        .filter(models.Coil.add_date >= interval_start, models.Coil.add_date <= interval_end)
+        .order_by(models.Coil.length.asc())
+        .first()
+        .add_date
+    )
+
+    max_coil_date = (
+        db.query(models.Coil.add_date)
+        .filter(models.Coil.add_date >= interval_start, models.Coil.add_date <= interval_end)
+        .order_by(models.Coil.length.desc())
+        .first()
+        .add_date
+    )
+    resp["min_coil_count"] = {"date": min_coil_date, "count": min_coil_count}
+    resp["max_coil_count"] = {"date": max_coil_date, "count": max_coil_count}
+
+    min_weight_date = (
+        db.query(models.Coil.add_date, func.sum(models.Coil.weight).label('total_weight'))
+        .filter(models.Coil.add_date >= interval_start, models.Coil.add_date <= interval_end)
+        .group_by(models.Coil.add_date)
+        .order_by('total_weight')
+        .first()
+    )
+
+    # Запрос для нахождения даты с максимальным суммарным весом
+    max_weight_date = (
+        db.query(models.Coil.add_date, func.sum(models.Coil.weight).label('total_weight'))
+        .filter(models.Coil.add_date >= interval_start, models.Coil.add_date <= interval_end)
+        .group_by(models.Coil.add_date)
+        .order_by(func.sum(models.Coil.weight).desc())
+        .first()
+    )
+
+    resp['summ_weight'] = {'min': min_weight_date, 'max': max_weight_date}
+    
     return resp
 
 @app.delete('/api/DELETE/coil/{coil_id}')
