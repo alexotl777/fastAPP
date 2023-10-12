@@ -1,6 +1,6 @@
 import datetime, pytz
 from typing import List, Annotated
-from fastapi import FastAPI, HTTPException, Request, Response, status, Depends
+from fastapi import FastAPI, HTTPException, Request, Response, status, Depends, Query
 from pydantic import BaseModel, Field, ValidationError, validator
 
 from fastapi.encoders import jsonable_encoder
@@ -95,6 +95,36 @@ async def set_coil(coil_id: int, db: db_dependency):
     print(db.query(models.Coil))
     if not result:
         raise HTTPException(status_code=404, detail="Coil is not found")
+    return result
+
+@app.get('/api/GET/coil/')
+async def get_coils(
+    db: db_dependency,
+    start_id: int = Query(None, description="ID начального рулона"),
+    end_id: int = Query(None, description="ID конечного рулона"),
+    start_weight: float = Query(None, description="Начальный вес рулона"),
+    end_weight: float = Query(None, description="Конечный вес рулона"),
+    start_length: int = Query(None, description="Начальная длина рулона"),
+    end_length: int = Query(None, description="Конечная длина рулона"),
+    start_addition_date: datetime.date = Query(None, description="Начальная дата добавления на склад"),
+    end_addition_date: datetime.date = Query(None, description="Конечная дата добавления на склад"),
+    start_removal_date: datetime.date = Query(None, description="Начальная дата удаления со склада"),
+    end_removal_date: datetime.date = Query(None, description="Конечная дата удаления со склада")):
+    arr_req = []
+
+    if start_id and end_id:
+        arr_req.append(and_(models.Coil.id >= start_id, models.Coil.id <= end_id))
+    if start_weight and end_weight:
+        arr_req.append(and_(models.Coil.weight >= start_weight, models.Coil.weight <= end_weight))
+    if start_length and end_length:
+        arr_req.append(and_(models.Coil.length >= start_length, models.Coil.length <= end_length))
+    if start_addition_date and end_addition_date:
+        arr_req.append(and_(models.Coil.add_date >= start_addition_date, models.Coil.add_date <= end_addition_date))
+    if start_removal_date and end_removal_date:
+        arr_req.append(and_(models.Coil.delete_date >= start_removal_date, models.Coil.delete_date <= end_removal_date))
+    
+    result = db.query(models.Coil).filter(and_(i for i in arr_req)).all()
+    
     return result
 
 @app.get('/api/GET/coil/id/')
